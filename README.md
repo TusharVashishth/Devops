@@ -18,6 +18,22 @@ Complete guide for deploying a Node.js backend application to AWS EC2 instances 
 
 📖 **[Read the full deployment guide](./nodejs-backend/deploy.md)**
 
+### Kubernetes Crash Course (Local Setup with Minikube)
+
+Complete guide for running containerized apps locally using Kubernetes. Covers core K8s concepts, local cluster setup with Minikube and kubectl, and production-ready manifests for Deployment, Service, and Horizontal Pod Autoscaler (HPA).
+
+**Features:**
+
+- Local Kubernetes cluster with Minikube (macOS, Windows, Linux)
+- Deployment with rolling updates, health checks (liveness + readiness probes)
+- NodePort Service for local access
+- HPA — auto-scales Pods based on CPU/memory usage
+- Full kubectl + Minikube commands cheatsheet with real-life explanations
+
+📖 **[Read the full Kubernetes guide](./kubernetes/README.md)**
+
+---
+
 ## 🔮 Future Deployments
 
 We're continuously expanding our deployment guides. Upcoming additions include:

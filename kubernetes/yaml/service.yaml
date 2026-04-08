@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  # Name of the Service — used in kubectl commands and as the DNS name inside the cluster.
+  # Other Pods can reach this service via http://joke-api-service:<port>
+  name: joke-api-service
+  labels:
+    app: joke-api
+
+spec:
+  # Service type controls how the service is exposed:
+  #
+  #   ClusterIP    — (default) only reachable from inside the cluster.
+  #                  Use for internal microservice communication.
+  #
+  #   NodePort     — exposed on every Node's IP at a fixed port (30000-32767).
+  #                  Accessible from outside the cluster at <NodeIP>:<nodePort>.
+  #                  Good for local dev / Minikube.
+  #                  Use: minikube service joke-api-service --url
+  #
+  #   LoadBalancer — provisions an external cloud load balancer (AWS ELB, GCP LB etc.).
+  #                  Locally with Minikube, use `minikube tunnel` to simulate this.
+  #
+  #   ExternalName — maps a service to an external DNS name (e.g. a managed DB).
+  #
+  # Using NodePort here so it works out-of-the-box with Minikube.
+  type: NodePort
+
+  selector:
+    # Routes traffic to Pods that have this label.
+    # Must match template.metadata.labels in the Deployment.
+    app: joke-api
+
+  ports:
+    - name: http
+      protocol: TCP
+
+      # port: the port that THIS Service listens on (inside the cluster).
+      # Other services/pods call this Service at port 80.
+      port: 80
+
+      # targetPort: the port on the POD (container) that receives the traffic.
+      # Must match containerPort in the Deployment.
+      targetPort: 3000
+
+      # nodePort: the port exposed on the Node's external IP.
+      # Valid range: 30000–32767.
+      # Omit this field to let Kubernetes assign one automatically.
+      # Access locally: minikube service joke-api-service --url
+      nodePort: 30080

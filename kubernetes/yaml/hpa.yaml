@@ -1,0 +1,78 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+
+metadata:
+  # Name of the HPA resource
+  name: joke-api-hpa
+  labels:
+    app: joke-api
+
+spec:
+  # scaleTargetRef: points to the Deployment (or StatefulSet/ReplicaSet) that this HPA will scale.
+  # The HPA controller will increase/decrease .spec.replicas on the target Deployment.
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: joke-api       # Must exactly match metadata.name in deployment.yaml
+
+  # minReplicas: the HPA will NEVER scale below this number.
+  # Even under zero load, at least 2 replicas stay running for high availability.
+  minReplicas: 2
+
+  # maxReplicas: the HPA will NEVER scale above this number.
+  # Acts as a safety cap to prevent runaway scaling and unexpected cloud costs.
+  maxReplicas: 10
+
+  # metrics: the signals the HPA watches to decide when to scale.
+  metrics:
+    # --- CPU-based scaling ---
+    # Scale up when average CPU utilization across all Pods exceeds 60%.
+    # Scale down when it drops back below (with a cooldown period).
+    #
+    # IMPORTANT: This requires:
+    #   1. resources.requests.cpu to be set in the Deployment (so K8s knows the baseline).
+    #   2. metrics-server to be running: `minikube addons enable metrics-server`
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          # Utilization = (current CPU usage / requested CPU) * 100
+          # e.g. if requested is 100m and container uses 65m → utilization = 65% → scale up
+          type: Utilization
+          averageUtilization: 60
+
+    # --- Memory-based scaling ---
+    # Scale up when average memory utilization across all Pods exceeds 70%.
+    # Memory-based scaling is trickier — apps often don't release memory even under low load.
+    # Use with caution; CPU scaling is usually sufficient.
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+  # behavior: controls the speed of scale-up and scale-down.
+  # Without this, default behavior applies (immediate scale-up, slower scale-down).
+  behavior:
+    scaleUp:
+      # stabilizationWindowSeconds: HPA waits this long before acting on scale-up signals.
+      # Prevents thrashing when load spikes briefly (e.g., a short burst of traffic).
+      stabilizationWindowSeconds: 60
+      policies:
+        # Allow adding at most 2 replicas every 60 seconds during scale-up.
+        # Prevents the HPA from going from 2 → 10 replicas in a single step.
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+
+    scaleDown:
+      # stabilizationWindowSeconds: HPA waits this long before scaling down.
+      # 300s = 5 minutes. Prevents scale-down too quickly after a traffic spike.
+      stabilizationWindowSeconds: 300
+      policies:
+        # Allow removing at most 1 replica every 60 seconds during scale-down.
+        # Gradual scale-down avoids dropping too many Pods at once.
+        - type: Pods
+          value: 1
+          periodSeconds: 60

@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  # Name of the Deployment resource — used to reference it in kubectl commands
+  name: joke-api
+  labels:
+    # Labels on the Deployment itself (not the Pods) — useful for grouping/filtering
+    app: joke-api
+
+spec:
+  # Number of identical Pod replicas to run at all times.
+  # Kubernetes will maintain this count — if a Pod crashes, it gets replaced.
+  replicas: 2
+
+  selector:
+    matchLabels:
+      # This selector tells the Deployment which Pods it owns/manages.
+      # Must match the labels defined in template.metadata.labels below.
+      app: joke-api
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # maxUnavailable: during an update, at most 1 Pod can be unavailable at a time.
+      # This ensures near-zero downtime during deploys.
+      maxUnavailable: 1
+      # maxSurge: during an update, at most 1 extra Pod can be created above the desired replica count.
+      maxSurge: 1
+
+  template:
+    metadata:
+      labels:
+        # Labels applied to every Pod created by this Deployment.
+        # Must match the selector.matchLabels above, and must match the Service selector.
+        app: joke-api
+
+    spec:
+      containers:
+        - name: joke-api
+          # Replace with your actual image. For local Minikube dev, build into Minikube's Docker daemon:
+          # eval $(minikube docker-env) && docker build -t joke-api:latest .
+          image: joke-api:latest
+
+          # imagePullPolicy: Never tells Kubernetes not to pull from a registry —
+          # use the image already present in Minikube's local Docker daemon.
+          # Change to IfNotPresent or Always when using a real registry.
+          imagePullPolicy: Never
+
+          ports:
+            # The port your app listens on inside the container.
+            # Must match targetPort in the Service.
+            - containerPort: 3000
+
+          # Resource requests and limits are required for HPA (autoscaling) to work.
+          resources:
+            requests:
+              # Minimum CPU/memory guaranteed to this container.
+              # Kubernetes uses this for scheduling (finding a node with enough capacity).
+              cpu: "100m"       # 100 millicores = 0.1 vCPU
+              memory: "128Mi"   # 128 MiB
+            limits:
+              # Maximum CPU/memory this container is allowed to use.
+              # If memory limit is exceeded, the Pod is OOMKilled and restarted.
+              cpu: "500m"       # 500 millicores = 0.5 vCPU
+              memory: "256Mi"   # 256 MiB
+
+          # --- Liveness Probe ---
+          # Kubernetes uses this to decide if the container is ALIVE.
+          # If this check fails (after failureThreshold attempts), the container is RESTARTED.
+          # Use for detecting deadlocks or hung states that don't crash the process.
+          livenessProbe:
+            httpGet:
+              path: /health     # Your app must expose a health endpoint
+              port: 3000
+            initialDelaySeconds: 15   # Wait 15s before the first check (give app time to start)
+            periodSeconds: 20         # Check every 20 seconds
+            failureThreshold: 3       # Restart after 3 consecutive failures
+
+          # --- Readiness Probe ---
+          # Kubernetes uses this to decide if the container is READY to receive traffic.
+          # If this check fails, the Pod is removed from the Service's endpoint list.
+          # Traffic is only sent once this passes. Use for waiting on DB connections, cache warm-up, etc.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5    # Start checking after 5s
+            periodSeconds: 10         # Check every 10 seconds
+            failureThreshold: 3       # Remove from service after 3 failures
+
+          # Environment variables passed into the container.
+          # For sensitive values, use secretKeyRef instead of value.
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3000"
+            # Example of pulling a value from a Secret:
+            # - name: DB_PASSWORD
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: joke-api-secret
+            #       key: DB_PASSWORD
